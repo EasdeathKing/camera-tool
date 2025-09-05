@@ -3,9 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>摄像头测试</title>
+    <title>二维码加密解密工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
 </head>
 <body>
+    <h2>内容加密生成二维码</h2>
+    <input type="text" id="textInput" placeholder="输入内容" style="width:70%;">
+    <button id="encryptBtn">生成二维码</button>
+    <div id="qrcode" style="margin-top:10px;"></div>
+
+    <h2>扫码解密</h2>
+    <div id="reader" style="width:300px;"></div>
+    <p>解密内容: <span id="decryptedText"></span></p>
+
     <h2>手机摄像头测试</h2>
     <video id="video" width="100%" autoplay playsinline></video>
     <button id="snap">拍照</button>
@@ -13,21 +25,46 @@
     <img id="photo" alt="拍摄的照片" style="width:100%; margin-top:10px;"/>
 
     <script>
+        const secretKey = "123456"; // 加密秘钥
+
+        // 生成二维码
+        document.getElementById('encryptBtn').addEventListener('click', () => {
+            const text = document.getElementById('textInput').value;
+            if(!text) return alert("请输入内容");
+            const encrypted = CryptoJS.AES.encrypt(text, secretKey).toString();
+            QRCode.toCanvas(document.getElementById('qrcode'), encrypted, { width: 200 }, function (error) {
+                if (error) console.error(error);
+            });
+        });
+
+        // 扫码解密
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                const bytes  = CryptoJS.AES.decrypt(decodedText, secretKey);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                document.getElementById('decryptedText').innerText = originalText;
+            } catch(e) {
+                document.getElementById('decryptedText').innerText = "解密失败";
+            }
+        }
+
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            onScanSuccess
+        );
+
+        // 摄像头拍照功能
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
         const photo = document.getElementById('photo');
         const snap = document.getElementById('snap');
 
-        // 请求摄像头
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(err => {
-                alert('无法访问摄像头: ' + err);
-            });
+            .then(stream => { video.srcObject = stream; })
+            .catch(err => { alert('无法访问摄像头: ' + err); });
 
-        // 拍照
         snap.addEventListener('click', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;

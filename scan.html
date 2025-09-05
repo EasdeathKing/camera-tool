@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>扫码解密二维码</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+</head>
+<body>
+    <h2>扫码解密二维码</h2>
+    <div id="reader" style="width:300px;"></div>
+    <p>解密内容: <span id="decryptedText"></span></p>
+
+    <script>
+        const secretKey = "123456"; // 必须和生成二维码页面一致
+
+        function onScanSuccess(decodedText, decodedResult) {
+            try {
+                const bytes  = CryptoJS.AES.decrypt(decodedText, secretKey);
+                const originalText = bytes.toString(CryptoJS.enc.Utf8);
+                document.getElementById('decryptedText').innerText = originalText || "解密失败";
+            } catch(e) {
+                document.getElementById('decryptedText').innerText = "解密失败";
+            }
+        }
+
+        const html5QrcodeScanner = new Html5Qrcode("reader");
+        html5QrcodeScanner.start(
+            { facingMode: "environment" },
+            { fps: 10, qrbox: 250 },
+            onScanSuccess
+        );
+    </script>
+</body>
+</html>

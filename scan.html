@@ -6,14 +6,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
         body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-        video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
+        video { width: 100%; max-width: 400px; border: 1px solid #ccc; margin-top: 10px; }
         #result { margin-top: 20px; font-size: 1.2em; color: green; word-break: break-all; }
+        button { margin: 10px; padding: 8px 16px; font-size: 1em; }
     </style>
 </head>
 <body>
     <h2>扫码解密二维码</h2>
-    <video id="video" autoplay></video>
-    <div id="result">请对准二维码进行扫描...</div>
+    <button id="toggleCameraBtn">开启摄像头</button>
+    <video id="video" autoplay style="display:none;"></video>
+    <div id="result">摄像头未开启</div>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
@@ -21,25 +23,51 @@
     <script>
         const video = document.getElementById('video');
         const resultDiv = document.getElementById('result');
+        const toggleBtn = document.getElementById('toggleCameraBtn');
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         const secretKey = "123456"; // 与 generate.html 一致
 
-        let scanning = true;
+        let scanning = false;
         let stream;
 
-        // 打开摄像头
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(s => {
-                stream = s;
-                video.srcObject = stream;
-                video.setAttribute("playsinline", true); // iOS 支持
-                video.play();
-                requestAnimationFrame(scan);
-            })
-            .catch(err => {
-                resultDiv.textContent = "无法打开摄像头: " + err;
-            });
+        // 开关摄像头
+        toggleBtn.addEventListener('click', () => {
+            if (scanning) {
+                stopCamera();
+            } else {
+                startCamera();
+            }
+        });
+
+        function startCamera() {
+            navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+                .then(s => {
+                    stream = s;
+                    video.srcObject = stream;
+                    video.setAttribute("playsinline", true); // iOS 支持
+                    video.style.display = 'block';
+                    video.play();
+                    scanning = true;
+                    toggleBtn.textContent = "关闭摄像头";
+                    resultDiv.textContent = "请对准二维码进行扫描...";
+                    requestAnimationFrame(scan);
+                })
+                .catch(err => {
+                    resultDiv.textContent = "无法打开摄像头: " + err;
+                });
+        }
+
+        function stopCamera() {
+            scanning = false;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+            }
+            video.style.display = 'none';
+            toggleBtn.textContent = "开启摄像头";
+            resultDiv.textContent = "摄像头已关闭";
+        }
 
         function scan() {
             if (!scanning) return;
@@ -53,11 +81,9 @@
 
                 if (code) {
                     try {
-                        // 解密
                         const decrypted = CryptoJS.AES.decrypt(code.data, secretKey).toString(CryptoJS.enc.Utf8);
                         if (decrypted) {
                             resultDiv.textContent = "解密内容: " + decrypted;
-                            stopCamera();
                         } else {
                             resultDiv.textContent = "扫描到内容，但解密失败";
                         }
@@ -67,13 +93,6 @@
                 }
             }
             requestAnimationFrame(scan);
-        }
-
-        function stopCamera() {
-            scanning = false;
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
         }
     </script>
 </body>

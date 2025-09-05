@@ -2,57 +2,64 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <title>二维码解密扫描</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>扫码解密二维码</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
-    <script src="https://unpkg.com/html5-qrcode/minified/html5-qrcode.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin: 0; padding: 20px; }
+        video { width: 100%; max-width: 400px; border: 1px solid #ccc; }
+        #result { margin-top: 20px; font-size: 1.2em; color: green; word-break: break-all; }
+    </style>
 </head>
 <body>
     <h2>扫码解密二维码</h2>
+    <video id="video" autoplay></video>
+    <div id="result">请对准二维码进行扫描...</div>
 
-    <button id="startBtn">启动摄像头</button>
-    <button id="stopBtn" disabled>停止摄像头</button>
-    <div id="reader" style="width:300px; margin-top:10px;"></div>
-
-    <p>解密内容: <span id="decryptedText"></span></p>
-
+    <!-- CryptoJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <!-- jsQR -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
     <script>
-        const secretKey = "123456"; // 必须和生成二维码页面一致
-        const html5QrcodeScanner = new Html5Qrcode("reader");
+        const video = document.getElementById('video');
+        const resultDiv = document.getElementById('result');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
 
-        function onScanSuccess(decodedText, decodedResult) {
-            try {
-                const bytes = CryptoJS.AES.decrypt(decodedText, secretKey);
-                const originalText = bytes.toString(CryptoJS.enc.Utf8);
-                document.getElementById('decryptedText').innerText = originalText || "解密失败";
-            } catch(e) {
-                document.getElementById('decryptedText').innerText = "解密失败";
+        const AES_KEY = "your-secret-key"; // 这里和 generate.html 的密钥一致
+
+        // 打开摄像头
+        navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
+            .then(stream => {
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true); // iOS 支持
+                video.play();
+                requestAnimationFrame(tick);
+            })
+            .catch(err => {
+                resultDiv.textContent = "无法打开摄像头: " + err;
+            });
+
+        function tick() {
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                if (code) {
+                    try {
+                        // AES 解密
+                        const bytes = CryptoJS.AES.decrypt(code.data, AES_KEY);
+                        const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
+                        resultDiv.textContent = "解密内容: " + decryptedText;
+                    } catch (e) {
+                        resultDiv.textContent = "解密失败: " + e;
+                    }
+                } 
             }
+            requestAnimationFrame(tick);
         }
-
-        // 启动摄像头
-        document.getElementById('startBtn').addEventListener('click', () => {
-            html5QrcodeScanner.start(
-                { facingMode: "environment" },
-                { fps: 10, qrbox: 250 },
-                onScanSuccess
-            ).then(() => {
-                document.getElementById('startBtn').disabled = true;
-                document.getElementById('stopBtn').disabled = false;
-            }).catch(err => {
-                alert("启动摄像头失败: " + err);
-            });
-        });
-
-        // 停止摄像头
-        document.getElementById('stopBtn').addEventListener('click', () => {
-            html5QrcodeScanner.stop().then(() => {
-                document.getElementById('startBtn').disabled = false;
-                document.getElementById('stopBtn').disabled = true;
-            }).catch(err => {
-                alert("停止摄像头失败: " + err);
-            });
-        });
     </script>
 </body>
 </html>

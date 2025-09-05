@@ -15,7 +15,6 @@
     <video id="video" autoplay></video>
     <div id="result">请对准二维码进行扫描...</div>
 
-    <!-- 引入库 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
 
@@ -24,12 +23,15 @@
         const resultDiv = document.getElementById('result');
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
+        const secretKey = "123456"; // 与 generate.html 一致
 
-        const secretKey = "123456"; // 和 generate.html 一致
+        let scanning = true;
+        let stream;
 
         // 打开摄像头
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } })
-            .then(stream => {
+            .then(s => {
+                stream = s;
                 video.srcObject = stream;
                 video.setAttribute("playsinline", true); // iOS 支持
                 video.play();
@@ -40,6 +42,8 @@
             });
 
         function scan() {
+            if (!scanning) return;
+
             if (video.readyState === video.HAVE_ENOUGH_DATA) {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -49,15 +53,27 @@
 
                 if (code) {
                     try {
-                        const bytes = CryptoJS.AES.decrypt(code.data, secretKey);
-                        const decryptedText = bytes.toString(CryptoJS.enc.Utf8);
-                        resultDiv.textContent = "解密内容: " + decryptedText;
+                        // 解密
+                        const decrypted = CryptoJS.AES.decrypt(code.data, secretKey).toString(CryptoJS.enc.Utf8);
+                        if (decrypted) {
+                            resultDiv.textContent = "解密内容: " + decrypted;
+                            stopCamera();
+                        } else {
+                            resultDiv.textContent = "扫描到内容，但解密失败";
+                        }
                     } catch (e) {
-                        resultDiv.textContent = "解密失败: " + e;
+                        resultDiv.textContent = "解密错误: " + e;
                     }
                 }
             }
             requestAnimationFrame(scan);
+        }
+
+        function stopCamera() {
+            scanning = false;
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
         }
     </script>
 </body>
